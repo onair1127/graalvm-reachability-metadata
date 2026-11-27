@@ -7,7 +7,6 @@
 package com.zaxxer.hikaricp.test;
 
 import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.SQLExceptionOverride;
 import com.zaxxer.hikaricp.test.driver.CustomDriver;
 import org.junit.jupiter.api.Test;
@@ -50,7 +49,7 @@ public class HikariConfigTest {
     }
 
     @Test
-    void settersCanBeInvokedThroughDynamicReflection() throws Exception {
+    public void settersCanBeInvokedThroughDynamicReflection() throws Exception {
         Properties props = new Properties();
         try (var is = getClass().getClassLoader().getResourceAsStream("hikari-config-test.properties")) {
             if (is == null) {
@@ -59,27 +58,49 @@ public class HikariConfigTest {
             props.load(is);
         }
 
-        String className = "com.zaxxer.hikari.HikariDataSource";
-        HikariDataSource config = (HikariDataSource) Class.forName(className)
-                .getDeclaredConstructor()
-                .newInstance();
+        for (String key : props.stringPropertyNames()) {
+            if (key.startsWith("dataSource.")) {
+                props.setProperty(key.substring("dataSource.".length()), props.getProperty(key));
+            }
+        }
 
-        invokeDynamicSetter(config, "jdbcUrl", String.class, props.getProperty("jdbcUrl"));
-        invokeDynamicSetter(config, "maximumPoolSize", int.class, Integer.parseInt(props.getProperty("maximumPoolSize")));
-        invokeDynamicSetter(config, "minimumIdle", int.class, Integer.parseInt(props.getProperty("minimumIdle")));
-        invokeDynamicSetter(config, "username", String.class, props.getProperty("username"));
-        invokeDynamicSetter(config, "password", String.class, props.getProperty("password"));
+        String jdbcUrl = props.getProperty("jdbcUrl");
+        String username = props.getProperty("username");
+        String password = props.getProperty("password");
+        String driverClassName = props.getProperty("driverClassName");
+        String catalog = props.getProperty("catalog");
 
-        invokeDynamicSetter(config, "driverClassName", String.class, props.getProperty("driverClassName"));
-        invokeDynamicSetter(config, "catalog", String.class, props.getProperty("catalog"));
-        invokeDynamicSetter(config, "connectionTimeout", long.class, Long.parseLong(props.getProperty("connectionTimeout")));
-        invokeDynamicSetter(config, "idleTimeout", long.class, Long.parseLong(props.getProperty("idleTimeout")));
-        invokeDynamicSetter(config, "leakDetectionThreshold", long.class, Long.parseLong(props.getProperty("leakDetectionThreshold")));
-        invokeDynamicSetter(config, "maxLifetime", long.class, Long.parseLong(props.getProperty("maxLifetime")));
-        invokeDynamicSetter(config, "validationTimeout", long.class, Long.parseLong(props.getProperty("validationTimeout")));
+        int maximumPoolSize = Integer.parseInt(props.getProperty("maximumPoolSize"));
+        int minimumIdle = Integer.parseInt(props.getProperty("minimumIdle"));
+
+        long connectionTimeout = Long.parseLong(props.getProperty("connectionTimeout"));
+        long idleTimeout = Long.parseLong(props.getProperty("idleTimeout"));
+        long leakDetectionThreshold = Long.parseLong(props.getProperty("leakDetectionThreshold"));
+        long maxLifetime = Long.parseLong(props.getProperty("maxLifetime"));
+        long validationTimeout = Long.parseLong(props.getProperty("validationTimeout"));
+
+        boolean readOnly = Boolean.parseBoolean(props.getProperty("readOnly"));
+        boolean autoCommit = Boolean.parseBoolean(props.getProperty("autoCommit"));
+
+        HikariConfig config = new HikariConfig();
+
+        invokeDynamicSetter(config, "jdbcUrl", String.class, jdbcUrl);
+        invokeDynamicSetter(config, "maximumPoolSize", int.class, maximumPoolSize);
+        invokeDynamicSetter(config, "minimumIdle", int.class, minimumIdle);
+        invokeDynamicSetter(config, "username", String.class, username);
+        invokeDynamicSetter(config, "password", String.class, password);
+        invokeDynamicSetter(config, "driverClassName", String.class, driverClassName);
+        invokeDynamicSetter(config, "catalog", String.class, catalog);
+        invokeDynamicSetter(config, "connectionTimeout", long.class, connectionTimeout);
+        invokeDynamicSetter(config, "idleTimeout", long.class, idleTimeout);
+        invokeDynamicSetter(config, "leakDetectionThreshold", long.class, leakDetectionThreshold);
+        invokeDynamicSetter(config, "maxLifetime", long.class, maxLifetime);
+        invokeDynamicSetter(config, "validationTimeout", long.class, validationTimeout);
+        invokeDynamicSetter(config, "readOnly", boolean.class, readOnly);
+        invokeDynamicSetter(config, "autoCommit", boolean.class, autoCommit);
+        invokeDynamicSetter(config, "dataSourceProperties", Properties.class, props);
 
         assertThatConfigurationLoaded(config);
-        config.close();
     }
 
     private void invokeDynamicSetter(Object target, String propertyName, Class<?> paramType, Object value) throws Exception {
@@ -100,6 +121,11 @@ public class HikariConfigTest {
         assertThat(config.getLeakDetectionThreshold()).isEqualTo(11000);
         assertThat(config.getMaxLifetime()).isEqualTo(2800000);
         assertThat(config.getValidationTimeout()).isEqualTo(500);
+        assertThat(config.isReadOnly()).isEqualTo(true);
+        assertThat(config.isAutoCommit()).isEqualTo(true);
+        assertThat(config.getDataSourceProperties())
+            .containsEntry("cachePrepStmts", "true")
+            .containsEntry("prepStmtCacheSize", "250");
     }
 
     public static final class TestExceptionOverride implements SQLExceptionOverride {
